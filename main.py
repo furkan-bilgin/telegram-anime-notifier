@@ -90,7 +90,7 @@ def test_anime_title_match(title1, title2):
 
     title1, title2 = _format_title(title1), _format_title(title2)
 
-    return Levenshtein.distance(title1, title2) <= 3
+    return Levenshtein.distance(title1, title2) <= 1
 
 
 def main():

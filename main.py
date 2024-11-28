@@ -137,7 +137,10 @@ def main():
         mal_title = mal_matching_anime["anime_title"]
         if "episode_number" not in anime:
             continue
-        anime_episode_number = int(anime["episode_number"])
+        if isinstance(anime["episode_number"], list):
+            anime_episode_number = int(anime["episode_number"][-1])
+        else:
+            anime_episode_number = int(anime["episode_number"])
 
         if "anime_episodes" not in data:
             data["anime_episodes"] = {}

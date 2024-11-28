@@ -1,13 +1,14 @@
-import logging
-import re
 import html
 import json
-import anitopy
-import Levenshtein
-import requests
+import logging
+import re
 from datetime import datetime
 from os import environ
 from os.path import isfile
+
+import anitopy
+import Levenshtein
+import requests
 from dotenv import load_dotenv
 
 # Set up logging
@@ -16,7 +17,6 @@ logging.root.setLevel(logging.INFO)
 
 
 # Set up envs
-
 load_dotenv()
 
 MAL_TARGET = "https://myanimelist.net/animelist/" + environ["MAL_TARGET_USER"]
@@ -34,9 +34,7 @@ DATA_JSON_PATH = "./data.json"
 def get_mal_data():
     MAL_REGEX = r'data-items="(.+?)" data-broadcast'
     return json.loads(
-        html.unescape(
-            re.findall(MAL_REGEX, requests.get(MAL_TARGET).text)[0]
-        )
+        html.unescape(re.findall(MAL_REGEX, requests.get(MAL_TARGET).text)[0])
     )
 
 
@@ -47,14 +45,16 @@ def get_mal_watching_anime():
 def _anitopy_try_parse(text):
     try:
         return anitopy.parse(text)
-    except:
+    except Exception:
         return None
 
 
 def get_nyaa_anime():
     NYAA_REGEX = r'title="\[(.+)"'
-    res = [_anitopy_try_parse(
-        "[" + x) for x in re.findall(NYAA_REGEX, requests.get(NYAA_URL).text)]
+    res = [
+        _anitopy_try_parse("[" + x)
+        for x in re.findall(NYAA_REGEX, requests.get(NYAA_URL).text)
+    ]
     return [x for x in res if x is not None]
 
 
@@ -74,8 +74,8 @@ def send_telegram_text(anime, mal_anime):
         f"https://api.telegram.org/bot{TELEGRAM_API_TOKEN}/sendMessage",
         data={
             "chat_id": TELEGRAM_CHAT_ID,
-            "text": f"[{now}] Episode {int(anime['episode_number'])} has been aired for '{episode_name}'!"
-        }
+            "text": f"[{now}] Episode {int(anime['episode_number'])} has been aired for '{episode_name}'!",
+        },
     ).raise_for_status()
 
 
@@ -95,7 +95,10 @@ def test_anime_title_match(title1, title2):
 
 def main():
     data = load_data()
-    if "mal_anime_cache" not in data or datetime.now().minute % REFRESH_MAL_ANIME_DATA_EVERY_MINUTES == 0:
+    if (
+        "mal_anime_cache" not in data
+        or datetime.now().minute % REFRESH_MAL_ANIME_DATA_EVERY_MINUTES == 0
+    ):
         try:
             data["mal_anime_cache"] = get_mal_watching_anime()
         except Exception as e:
@@ -104,7 +107,9 @@ def main():
                 return
             else:
                 logging.warning(
-                    "Could not get MAL data, MAL might be in maintenance.", exc_info=True)
+                    "Could not get MAL data, MAL might be in maintenance.",
+                    exc_info=True,
+                )
 
     mal_anime = data["mal_anime_cache"]
 
@@ -118,20 +123,28 @@ def main():
             anime["anime_title"], anime["anime_title_eng"] = rewrite, rewrite
 
         mal_matching_anime = next(
-            (x for x in mal_anime if (
-                test_anime_title_match(x["anime_title"], anime["anime_title"])
-                or test_anime_title_match(x["anime_title_eng"], anime["anime_title"])
-            )
-            ),
-            None
-        )
-        if (mal_matching_anime is None
-                or (mal_matching_anime["anime_end_date_string"] is not None
-                    and (datetime.now()
-                         - datetime.strptime(mal_matching_anime["anime_end_date_string"], "%m-%d-%y")
-                         ).days > 7
+            (
+                x
+                for x in mal_anime
+                if (
+                    test_anime_title_match(x["anime_title"], anime["anime_title"])
+                    or test_anime_title_match(
+                        x["anime_title_eng"], anime["anime_title"]
                     )
-            ):
+                )
+            ),
+            None,
+        )
+        if mal_matching_anime is None or (
+            mal_matching_anime["anime_end_date_string"] is not None
+            and (
+                datetime.now()
+                - datetime.strptime(
+                    mal_matching_anime["anime_end_date_string"], "%m-%d-%y"
+                )
+            ).days
+            > 7
+        ):
             continue
 
         mal_title = mal_matching_anime["anime_title"]
@@ -151,12 +164,13 @@ def main():
             data["anime_episodes"][mal_title] = anime_episode_number
             try:
                 send_telegram_text(anime, mal_matching_anime)
-                logging.info(
-                    f"Sent anime notification for '{anime['anime_title']}'")
+                logging.info(f"Sent anime notification for '{anime['anime_title']}'")
                 sent_notification_count += 1
-            except Exception as ex:
+            except Exception:
                 logging.error(
-                    f"Failed to notify Telegram for '{anime['anime_title']}'", exc_info=True)
+                    f"Failed to notify Telegram for '{anime['anime_title']}'",
+                    exc_info=True,
+                )
     save_data(data)
     if sent_notification_count > 0:
         logging.info(f"Done, sent {sent_notification_count} notifications!")
